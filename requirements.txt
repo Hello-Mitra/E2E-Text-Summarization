@@ -1,1 +1,10 @@
 cookiecutter
+dagshub
+mlflow
+ipykernel
+scikit-learn
+pandas
+numpy
+nltk
+setuptools
+xgboost
