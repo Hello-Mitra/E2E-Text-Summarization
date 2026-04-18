@@ -9,3 +9,6 @@ nltk
 setuptools
 xgboost
 dvc
+pyodbc
+
+-e .
