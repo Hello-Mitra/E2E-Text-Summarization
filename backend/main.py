@@ -62,7 +62,16 @@ PREDICTION_COUNT = Counter(
 # ── MLflow helpers ────────────────────────────────────────────────────────────
 
 def get_latest_model_version(model_name: str) -> str | None:
-    client   = mlflow.MlflowClient()
+    client = mlflow.MlflowClient()
+
+    # ✅ Try alias first (new way)
+    try:
+        version = client.get_model_version_by_alias(model_name, "production")
+        return version.version
+    except Exception:
+        pass
+
+    # Fallback to stage (old way — still works)
     versions = client.get_latest_versions(model_name, stages=["Production"])
     if not versions:
         versions = client.get_latest_versions(model_name, stages=["None"])

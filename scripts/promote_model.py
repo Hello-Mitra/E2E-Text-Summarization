@@ -9,7 +9,6 @@ def promote_model():
     os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
     os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
 
-    # ✅ Updated to your repo
     mlflow.set_tracking_uri(
         "https://dagshub.com/Hello-Mitra/E2E-Text-Summarization.mlflow"
     )
@@ -17,29 +16,22 @@ def promote_model():
     client     = mlflow.MlflowClient()
     model_name = "my_model"
 
-    # Get latest version in Staging
-    staging_versions = client.get_latest_versions(model_name, stages=["Staging"])
-    if not staging_versions:
+    # Get latest version in Staging (still works even if deprecated)
+    staging = client.get_latest_versions(model_name, stages=["Staging"])
+    if not staging:
         print("No model in Staging — nothing to promote")
         return
 
-    latest_staging = staging_versions[0].version
+    new_version = staging[0].version
 
-    # Archive current Production model
-    for version in client.get_latest_versions(model_name, stages=["Production"]):
-        client.transition_model_version_stage(
-            name=model_name,
-            version=version.version,
-            stage="Archived"
-        )
-
-    # Promote Staging → Production
-    client.transition_model_version_stage(
+    # ✅ Set alias "production" on the new version
+    client.set_registered_model_alias(
         name=model_name,
-        version=latest_staging,
-        stage="Production"
+        alias="production",
+        version=new_version
     )
-    print(f"Model version {latest_staging} promoted to Production ✅")
+
+    print(f"Model version {new_version} aliased as 'production' ✅")
 
 
 if __name__ == "__main__":
