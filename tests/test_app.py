@@ -14,27 +14,37 @@ class TestFastAPIApp(unittest.TestCase):
         patch("mlflow.set_tracking_uri").start()
         patch("backend.main.get_latest_model_version", return_value="4").start()
 
+        # Patch lifespan to do nothing — skip real model loading entirely
+        from contextlib import asynccontextmanager
+        @asynccontextmanager
+        async def mock_lifespan(app):
+            yield
+        patch("backend.main.lifespan", mock_lifespan).start()
+
+        from fastapi.testclient import TestClient
+        import backend.main as main_module
+        from backend.main import app
+
+        # ✅ Directly inject mocks into the module globals
         mock_model = MagicMock()
         mock_model.predict.return_value = np.array([1])
-        patch("mlflow.pyfunc.load_model", return_value=mock_model).start()
 
         mock_vectorizer = MagicMock()
         mock_transform = MagicMock()
         mock_transform.toarray.return_value = np.zeros((1, 100))
         mock_transform.shape = (1, 100)
         mock_vectorizer.transform.return_value = mock_transform
-        patch("pickle.load", return_value=mock_vectorizer).start()
 
-        patch("builtins.open", unittest.mock.mock_open()).start()
+        main_module.model         = mock_model
+        main_module.vectorizer    = mock_vectorizer
+        main_module.model_version = "4"
 
-        # ✅ Mock normalize_text so NLTK is never called during tests
+        # Mock normalize_text so NLTK is never called
         patch(
             "backend.main.normalize_text",
             return_value="this movie great"
         ).start()
 
-        from fastapi.testclient import TestClient
-        from backend.main import app
         cls.client = TestClient(app)
 
     @classmethod
