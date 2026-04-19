@@ -23,4 +23,7 @@ prometheus-client
 
 # AWS / DVC
 boto3
-dvc[s3]                 
+dvc[s3]     
+
+# Local package — makes src/ importable
+-e .
