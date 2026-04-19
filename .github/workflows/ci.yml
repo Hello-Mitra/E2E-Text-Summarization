@@ -31,6 +31,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # ── 4b. Force reinstall DVC with S3 support ───────────────────────────
+      - name: Install DVC with S3 support
+        run: pip install "dvc[s3]" --force-reinstall
+
       # ── 5. Download NLTK data ──────────────────────────────────────────────
       - name: Download NLTK data
         run: |
