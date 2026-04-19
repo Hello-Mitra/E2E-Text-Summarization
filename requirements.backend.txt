@@ -1,0 +1,27 @@
+# Core ML
+scikit-learn
+pandas
+numpy
+nltk
+
+# MLflow + DagsHub
+mlflow==2.15.0
+mlflow-skinny==2.15.0
+dagshub==0.3.34
+
+# API
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic
+
+# Monitoring
+prometheus-client
+
+# AWS / DVC
+boto3
+dvc
+dvc-s3
+
+# Utils
+setuptools==69.5.1
