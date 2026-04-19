@@ -23,110 +23,113 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.backend.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # ── 4. Install backend dependencies ───────────────────────────────────
-      - name: Install backend dependencies
-        run: pip install -r requirements.backend.txt
+      # ── 4. Install dependencies ────────────────────────────────────────────
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
       # ── 5. Download NLTK data ──────────────────────────────────────────────
       - name: Download NLTK data
         run: |
           python -c "import nltk; nltk.download('stopwords'); nltk.download('wordnet')"
 
-      # ── 6. Run DVC pipeline ────────────────────────────────────────────────
-      - name: Configure AWS credentials for DVC
-        run: |
-          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws configure set region ${{ secrets.AWS_REGION }}
+      # ── 6. Configure AWS credentials ───────────────────────────────────────
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ secrets.AWS_DEFAULT_REGION }}
+
+      # ── 7. Pull DVC artifacts + run pipeline ───────────────────────────────
+      - name: Pull DVC artifacts from S3
+        run: dvc pull
 
       - name: Run DVC pipeline
         env:
           CAPSTONE_TEST: ${{ secrets.CAPSTONE_TEST }}
         run: dvc repro
 
-      # ── 7. Run model tests ─────────────────────────────────────────────────
+      # ── 8. Run model tests ─────────────────────────────────────────────────
       - name: Run model tests
         env:
           CAPSTONE_TEST: ${{ secrets.CAPSTONE_TEST }}
         run: python -m unittest tests/test_model.py
 
-      # ── 8. Promote model to Production in MLflow ───────────────────────────
+      # ── 9. Promote model to Production ────────────────────────────────────
       - name: Promote model to Production
         if: success()
         env:
           CAPSTONE_TEST: ${{ secrets.CAPSTONE_TEST }}
         run: python scripts/promote_model.py
 
-      # ── 9. Run FastAPI app tests ───────────────────────────────────────────
+      # ── 10. Run FastAPI app tests ──────────────────────────────────────────
       - name: Run FastAPI app tests
         if: success()
         env:
           CAPSTONE_TEST: ${{ secrets.CAPSTONE_TEST }}
         run: python -m unittest tests/test_app.py
 
-      # # ── 10. Login to AWS ECR ───────────────────────────────────────────────
-      # - name: Login to AWS ECR
+      # # ── 11. Login to Amazon ECR ────────────────────────────────────────────
+      # - name: Login to Amazon ECR
       #   if: success()
-      #   run: |
-      #     aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #     aws configure set region ${{ secrets.AWS_REGION }}
-      #     aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
-      #     docker login --username AWS --password-stdin \
-      #     ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+      #   id: login-ecr
+      #   uses: aws-actions/amazon-ecr-login@v2
 
-      # # ── 11. Build Docker images ────────────────────────────────────────────
+      # # ── 12. Build Docker images ────────────────────────────────────────────
       # - name: Build Backend Docker image
+      #   if: success()
       #   run: docker build -f Dockerfile.backend -t sentiment-backend .
 
       # - name: Build Frontend Docker image
+      #   if: success()
       #   run: docker build -f Dockerfile.frontend -t sentiment-frontend .
 
-      # # ── 12. Tag and push images to ECR ─────────────────────────────────────
-      # - name: Tag Backend image
+      # # ── 13. Tag and push images to ECR ─────────────────────────────────────
+      # - name: Tag and push Backend image
+      #   if: success()
       #   run: |
       #     docker tag sentiment-backend:latest \
-      #     ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_BACKEND_REPO }}:latest
-
-      # - name: Push Backend image to ECR
-      #   run: |
+      #     ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:latest
       #     docker push \
-      #     ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_BACKEND_REPO }}:latest
+      #     ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:latest
 
-      # - name: Tag Frontend image
+      # - name: Tag and push Frontend image
+      #   if: success()
       #   run: |
       #     docker tag sentiment-frontend:latest \
-      #     ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_FRONTEND_REPO }}:latest
-
-      # - name: Push Frontend image to ECR
-      #   run: |
+      #     ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:latest
       #     docker push \
-      #     ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_FRONTEND_REPO }}:latest
+      #     ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:latest
 
-      # # ── 13. Deploy to EKS ─────────────────────────────────────────────────
+      # # ── 14. Deploy to EKS ──────────────────────────────────────────────────
       # - name: Set up kubectl
+      #   if: success()
       #   uses: azure/setup-kubectl@v3
       #   with:
       #     version: "latest"
 
       # - name: Update kubeconfig for EKS
+      #   if: success()
       #   run: |
       #     aws eks update-kubeconfig \
-      #     --region ${{ secrets.AWS_REGION }} \
+      #     --region ${{ secrets.AWS_DEFAULT_REGION }} \
       #     --name flask-app-cluster
 
       # - name: Create Kubernetes secret
+      #   if: success()
       #   run: |
       #     kubectl create secret generic capstone-secret \
       #       --from-literal=CAPSTONE_TEST=${{ secrets.CAPSTONE_TEST }} \
       #       --dry-run=client -o yaml | kubectl apply -f -
 
       # - name: Deploy backend to EKS
+      #   if: success()
       #   run: kubectl apply -f k8s/deployment-backend.yaml
 
       # - name: Deploy frontend to EKS
+      #   if: success()
       #   run: kubectl apply -f k8s/deployment-frontend.yaml

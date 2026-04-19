@@ -5,33 +5,33 @@ import json
 from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_auc_score
 import mlflow
 import mlflow.sklearn
-import dagshub
-# import os
+# import dagshub
+import os
 from src.logger import logging
 
 
 # Below code block is for production use
 # -------------------------------------------------------------------------------------
 # Set up DagsHub credentials for MLflow tracking
-# dagshub_token = os.getenv("CAPSTONE_TEST")
-# if not dagshub_token:
-#     raise EnvironmentError("CAPSTONE_TEST environment variable is not set")
+dagshub_token = os.getenv("CAPSTONE_TEST")
+if not dagshub_token:
+    raise EnvironmentError("CAPSTONE_TEST environment variable is not set")
 
-# os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
-# os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
+os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
+os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
 
-# dagshub_url = "https://dagshub.com"
-# repo_owner = "vikashdas770"
-# repo_name = "YT-Capstone-Project"
+dagshub_url = "https://dagshub.com"
+repo_owner = "vikashdas770"
+repo_name = "YT-Capstone-Project"
 
-# # Set up MLflow tracking URI
-# mlflow.set_tracking_uri(f'{dagshub_url}/{repo_owner}/{repo_name}.mlflow')
+# Set up MLflow tracking URI
+mlflow.set_tracking_uri(f'{dagshub_url}/{repo_owner}/{repo_name}.mlflow')
 # -------------------------------------------------------------------------------------
 
 # Below code block is for local use
 # -------------------------------------------------------------------------------------
-mlflow.set_tracking_uri('https://dagshub.com/Hello-Mitra/E2E-Text-Summarization.mlflow')
-dagshub.init(repo_owner='Hello-Mitra', repo_name='E2E-Text-Summarization', mlflow=True)
+# mlflow.set_tracking_uri('https://dagshub.com/Hello-Mitra/E2E-Text-Summarization.mlflow')
+# dagshub.init(repo_owner='Hello-Mitra', repo_name='E2E-Text-Summarization', mlflow=True)
 # -------------------------------------------------------------------------------------
 
 
