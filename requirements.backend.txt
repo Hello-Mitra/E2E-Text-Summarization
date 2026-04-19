@@ -3,6 +3,7 @@ scikit-learn
 pandas
 numpy
 nltk
+xgboost
 
 # MLflow + DagsHub
 mlflow==2.15.0
@@ -20,8 +21,8 @@ prometheus-client
 
 # AWS / DVC
 boto3
-dvc
-dvc-s3
+dvc[s3]          
+awscli         
 
 # Utils
 setuptools==69.5.1
