@@ -71,9 +71,9 @@ def save_data(train_data: pd.DataFrame, test_data: pd.DataFrame, data_path: str)
 
 def main():
     try:
-        # params = load_params(params_path='params.yaml')
-        # test_size = params['data_ingestion']['test_size']
-        test_size = 0.2
+        params = load_params(params_path='params.yaml')
+        test_size = params['data_ingestion']['test_size']
+        # test_size = 0.2
         
         s3 = s3_connection.s3_operations(os.getenv('S3_BUCKET_NAME'), os.getenv('AWS_ACCESS_KEY'), os.getenv('AWS_SECRET_KEY'))
         df = s3.fetch_file_from_s3("IMDB.csv")
