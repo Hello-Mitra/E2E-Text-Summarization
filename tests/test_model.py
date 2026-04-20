@@ -1,6 +1,7 @@
 import unittest
 import mlflow
 import os
+import tempfile
 import pandas as pd
 import pickle
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
@@ -23,95 +24,115 @@ class TestModelLoading(unittest.TestCase):
 
         client = mlflow.MlflowClient()
 
-        # ── Load challenger (new model to test) ───────────────────────────
+        # ── Load challenger + its own vectorizer ──────────────────────────
         try:
-            challenger = client.get_model_version_by_alias("my_model", "challenger")
+            challenger        = client.get_model_version_by_alias("my_model", "challenger")
             cls.new_model_version = challenger.version
         except Exception:
-            raise RuntimeError("No model with alias 'challenger' found — cannot run tests")
+            raise RuntimeError("No model with alias 'challenger' found")
 
-        cls.new_model = mlflow.pyfunc.load_model(
-            "models:/my_model@challenger"
-        )
-        print(f"\nChallenger model — version: {cls.new_model_version}")
+        cls.new_model      = mlflow.pyfunc.load_model("models:/my_model@challenger")
+        cls.new_vectorizer = cls.load_vectorizer_for_version("my_model", cls.new_model_version)
+        print(f"\nChallenger — version: {cls.new_model_version} | "
+              f"features: {len(cls.new_vectorizer.vocabulary_)}")
 
-        # ── Load champion (current production model) ──────────────────────
+        # ── Load champion + its own vectorizer ────────────────────────────
         try:
-            champion = client.get_model_version_by_alias("my_model", "champion")
+            champion              = client.get_model_version_by_alias("my_model", "champion")
             cls.prod_model_version = champion.version
         except Exception:
             cls.prod_model_version = None
 
         if cls.prod_model_version and cls.prod_model_version != cls.new_model_version:
-            cls.prod_model = mlflow.pyfunc.load_model(
-                "models:/my_model@champion"
-            )
-            print(f"Champion model   — version: {cls.prod_model_version}")
+            cls.prod_model      = mlflow.pyfunc.load_model("models:/my_model@champion")
+            cls.prod_vectorizer = cls.load_vectorizer_for_version("my_model", cls.prod_model_version)
+            print(f"Champion    — version: {cls.prod_model_version} | "
+                  f"features: {len(cls.prod_vectorizer.vocabulary_)}")
         else:
-            cls.prod_model = None
+            cls.prod_model      = None
+            cls.prod_vectorizer = None
             print("No separate champion model found — floor check only")
 
-        # ── Load vectorizer and holdout data ──────────────────────────────
-        with open("models/vectorizer.pkl", "rb") as f:
-            cls.vectorizer = pickle.load(f)
+        # ── Use interim processed data (raw cleaned text, not vectorized) ─
+        cls.holdout_data = pd.read_csv("data/interim/test_processed.csv")
 
-        cls.holdout_data = pd.read_csv("data/processed/test_tfidf.csv")
+    @staticmethod
+    def load_vectorizer_for_version(model_name: str, model_version: str):
+        """Download the vectorizer artifact logged with this specific model version."""
+        client = mlflow.MlflowClient()
+        mv     = client.get_model_version(model_name, model_version)
+        run_id = mv.run_id
+
+        with tempfile.TemporaryDirectory() as tmp:
+            local_path = mlflow.artifacts.download_artifacts(
+                run_id=run_id,
+                artifact_path="vectorizer/vectorizer.pkl",
+                dst_path=tmp
+            )
+            with open(local_path, "rb") as f:
+                return pickle.load(f)
+
+    @staticmethod
+    def vectorize(vectorizer, texts) -> pd.DataFrame:
+        """Transform raw text using a specific vectorizer."""
+        matrix = vectorizer.transform(texts)
+        return pd.DataFrame(
+            matrix.toarray(),
+            columns=[str(i) for i in range(matrix.shape[1])]
+        )
 
     def test_model_loaded_properly(self):
         self.assertIsNotNone(self.new_model)
 
     def test_model_signature(self):
         input_text = "this movie was absolutely brilliant"
-        input_data = self.vectorizer.transform([input_text])
-        input_df   = pd.DataFrame(
-            input_data.toarray(),
-            columns=[str(i) for i in range(input_data.shape[1])]
-        )
+        input_df   = self.vectorize(self.new_vectorizer, [input_text])
         prediction = self.new_model.predict(input_df)
-        self.assertEqual(input_df.shape[1], len(self.vectorizer.get_feature_names_out()))
+        self.assertEqual(input_df.shape[1], len(self.new_vectorizer.get_feature_names_out()))
         self.assertEqual(len(prediction), input_df.shape[0])
         self.assertEqual(len(prediction.shape), 1)
 
     def test_model_performance(self):
-        X_holdout = self.holdout_data.iloc[:, :-1]
-        y_holdout = self.holdout_data.iloc[:, -1]
+        X_raw     = self.holdout_data['review'].values
+        y_holdout = self.holdout_data['sentiment'].values
 
-        y_pred_new    = self.new_model.predict(X_holdout)
+        # ── Evaluate challenger with its own vectorizer ───────────────────
+        X_new      = self.vectorize(self.new_vectorizer, X_raw)
+        y_pred_new = self.new_model.predict(X_new)
+
         accuracy_new  = accuracy_score(y_holdout, y_pred_new)
         precision_new = precision_score(y_holdout, y_pred_new)
         recall_new    = recall_score(y_holdout, y_pred_new)
         f1_new        = f1_score(y_holdout, y_pred_new)
 
-        print(
-            f"\nChallenger — "
-            f"accuracy: {accuracy_new:.4f} | precision: {precision_new:.4f} | "
-            f"recall: {recall_new:.4f} | f1: {f1_new:.4f}"
-        )
+        print(f"\nChallenger — accuracy: {accuracy_new:.4f} | "
+              f"precision: {precision_new:.4f} | "
+              f"recall: {recall_new:.4f} | f1: {f1_new:.4f}")
 
         # Layer 1 — absolute floor
-        self.assertGreaterEqual(accuracy_new,  0.70, "Accuracy below floor")
-        self.assertGreaterEqual(precision_new, 0.70, "Precision below floor")
-        self.assertGreaterEqual(recall_new,    0.70, "Recall below floor")
-        self.assertGreaterEqual(f1_new,        0.70, "F1 below floor")
+        self.assertGreaterEqual(accuracy_new,  0.75, "Accuracy below floor")
+        self.assertGreaterEqual(precision_new, 0.75, "Precision below floor")
+        self.assertGreaterEqual(recall_new,    0.75, "Recall below floor")
+        self.assertGreaterEqual(f1_new,        0.75, "F1 below floor")
 
-        # Layer 2 — champion/challenger
+        # ── Compare against champion with its own vectorizer ──────────────
         if self.prod_model is not None:
-            y_pred_prod    = self.prod_model.predict(X_holdout)
+            X_prod      = self.vectorize(self.prod_vectorizer, X_raw)
+            y_pred_prod = self.prod_model.predict(X_prod)
+
             accuracy_prod  = accuracy_score(y_holdout, y_pred_prod)
             precision_prod = precision_score(y_holdout, y_pred_prod)
             recall_prod    = recall_score(y_holdout, y_pred_prod)
             f1_prod        = f1_score(y_holdout, y_pred_prod)
 
-            print(
-                f"Champion    — "
-                f"accuracy: {accuracy_prod:.4f} | precision: {precision_prod:.4f} | "
-                f"recall: {recall_prod:.4f} | f1: {f1_prod:.4f}"
-            )
+            print(f"Champion    — accuracy: {accuracy_prod:.4f} | "
+                  f"precision: {precision_prod:.4f} | "
+                  f"recall: {recall_prod:.4f} | f1: {f1_prod:.4f}")
 
-            self.assertGreaterEqual(accuracy_new,  accuracy_prod  - 0.01, "Accuracy regression vs champion")
-            self.assertGreaterEqual(precision_new, precision_prod - 0.01, "Precision regression vs champion")
-            self.assertGreaterEqual(recall_new,    recall_prod    - 0.01, "Recall regression vs champion")
-            self.assertGreaterEqual(f1_new,        f1_prod        - 0.01, "F1 regression vs champion")
+            self.assertGreaterEqual(accuracy_new,  accuracy_prod  - 0.01, "Accuracy regression")
+            self.assertGreaterEqual(precision_new, precision_prod - 0.01, "Precision regression")
+            self.assertGreaterEqual(recall_new,    recall_prod    - 0.01, "Recall regression")
+            self.assertGreaterEqual(f1_new,        f1_prod        - 0.01, "F1 regression")
         else:
             print("No champion to compare against — floor check only")
 

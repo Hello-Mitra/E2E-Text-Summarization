@@ -5,7 +5,7 @@ import json
 from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_auc_score
 import mlflow
 import mlflow.sklearn
-# import dagshub
+import dagshub
 import os
 from src.logger import logging
 
@@ -26,6 +26,12 @@ repo_name = "E2E-Text-Summarization"
 
 # Set up MLflow tracking URI
 mlflow.set_tracking_uri(f'{dagshub_url}/{repo_owner}/{repo_name}.mlflow')
+
+dagshub.init(
+    repo_owner="Hello-Mitra",
+    repo_name="E2E-Text-Summarization",
+    mlflow=True,
+)
 # -------------------------------------------------------------------------------------
 
 # Below code block is for local use
@@ -133,6 +139,14 @@ def main():
                 logging.info("✅ Model logged to MLflow successfully")
             except Exception as e:
                 logging.error(f"❌ Failed to log model: {e}")
+                raise
+
+            # Log vectorizer
+            try:
+                mlflow.log_artifact('models/vectorizer.pkl', artifact_path='vectorizer')
+                logging.info("✅ Vectorizer logged to MLflow successfully")
+            except Exception as e:
+                logging.error(f"❌ Failed to log vectorizer: {e}")
                 raise
 
             # Only runs if log_model succeeded
