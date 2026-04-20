@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 import os
-from contextlib import asynccontextmanager
-import pickle
 import re
 import string
+import tempfile
 import time
 import warnings
+from contextlib import asynccontextmanager
 
 import dagshub
 import mlflow
-import mlflow.pyfunc
+import mlflow.sklearn
 import pandas as pd
+import pickle
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.responses import Response
 from nltk.corpus import stopwords
@@ -24,10 +26,8 @@ from prometheus_client import (
     generate_latest,
 )
 from pydantic import BaseModel
-from dotenv import load_dotenv
 
 load_dotenv()
-
 warnings.simplefilter("ignore", UserWarning)
 warnings.filterwarnings("ignore")
 
@@ -65,14 +65,35 @@ PREDICTION_COUNT = Counter(
 # ── MLflow helpers ────────────────────────────────────────────────────────────
 
 def get_latest_model_version(model_name: str) -> str | None:
+    """Get version number of the champion model via alias."""
     client = mlflow.MlflowClient()
     try:
         version = client.get_model_version_by_alias(model_name, "champion")
         return version.version
-    except Exception:
-        # Fallback for first deployment before champion alias exists
+    except Exception as e:
+        print(f"⚠️ champion alias not found ({e}), falling back to latest version")
         versions = client.get_latest_versions(model_name, stages=["None"])
         return versions[0].version if versions else None
+
+
+def load_vectorizer_from_mlflow(model_name: str, version: str):
+    """
+    Download the vectorizer artifact logged alongside this specific
+    model version. Guarantees model + vectorizer are always from the
+    same training run — prevents feature mismatch errors.
+    """
+    client = mlflow.MlflowClient()
+    mv     = client.get_model_version(model_name, version)
+    run_id = mv.run_id
+
+    with tempfile.TemporaryDirectory() as tmp:
+        vec_path = mlflow.artifacts.download_artifacts(
+            run_id=run_id,
+            artifact_path="vectorizer/vectorizer.pkl",
+            dst_path=tmp
+        )
+        with open(vec_path, "rb") as f:
+            return pickle.load(f)
 
 
 # ── Lifespan — runs once on startup ──────────────────────────────────────────
@@ -81,46 +102,48 @@ def get_latest_model_version(model_name: str) -> str | None:
 async def lifespan(app: FastAPI):
     global model, vectorizer, model_version
 
+    # ── Auth ──────────────────────────────────────────────────────────────
     dagshub_token = os.getenv("CAPSTONE_TEST")
     if not dagshub_token:
         raise EnvironmentError("CAPSTONE_TEST environment variable is not set")
 
     os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
     os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
+    os.environ["DAGSHUB_USER_TOKEN"]        = dagshub_token
 
+    # ── MLflow + DagsHub setup ────────────────────────────────────────────
     mlflow.set_tracking_uri(
         "https://dagshub.com/Hello-Mitra/E2E-Text-Summarization.mlflow"
     )
-    dagshub.init(                              # ← only once
+    dagshub.init(
         repo_owner="Hello-Mitra",
         repo_name="E2E-Text-Summarization",
         mlflow=True,
     )
 
-    # ✅ Get version number from alias
+    # ── Load model ────────────────────────────────────────────────────────
+    # Using mlflow.sklearn.load_model (not pyfunc) so predict_proba
+    # is available directly on the sklearn object
     model_version = get_latest_model_version(MODEL_NAME)
     model_uri     = f"models:/{MODEL_NAME}@champion"
-
     print(f"Loading model from: {model_uri}")
-    model = mlflow.pyfunc.load_model(model_uri)
+    model = mlflow.sklearn.load_model(model_uri)
 
-    with open("models/vectorizer.pkl", "rb") as f:    # ✅ proper file close
-        vectorizer = pickle.load(f)
+    # ── Load matching vectorizer from same MLflow run ─────────────────────
+    # Always loaded from MLflow — never from local file — so model and
+    # vectorizer are guaranteed to have the same number of features
+    vectorizer = load_vectorizer_from_mlflow(MODEL_NAME, model_version)
 
     print(f"✅ Model '{MODEL_NAME}' version {model_version} loaded successfully")
-    yield
-    # -------------------------------------------------------------------------------------
+    print(f"✅ Vectorizer loaded — {len(vectorizer.vocabulary_)} features")
 
-    # Below code block is for local use
-    # -------------------------------------------------------------------------------------
-    # mlflow.set_tracking_uri('https://dagshub.com/Hello-Mitra/E2E-Text-Summarization.mlflow')
-    # dagshub.init(repo_owner='Hello-Mitra', repo_name='E2E-Text-Summarization', mlflow=True)
-    # -------------------------------------------------------------------------------------
+    yield
 
 
 # ── Text preprocessing ────────────────────────────────────────────────────────
 
 def normalize_text(text: str) -> str:
+    """Apply full preprocessing pipeline — must match training pipeline exactly."""
     lemmatizer = WordNetLemmatizer()
     stop_words = set(stopwords.words("english"))
     text = " ".join(w.lower() for w in text.split())
@@ -173,13 +196,12 @@ def predict(body: PredictRequest):
         columns=[str(i) for i in range(feats.shape[1])]
     )
 
-    result     = model.predict(feats_df)
-    prediction = int(result[0])
+    prediction = int(model.predict(feats_df)[0])
     sentiment  = "Positive" if prediction == 1 else "Negative"
 
+    # predict_proba works directly since we use mlflow.sklearn.load_model
     try:
-        proba      = model.predict_proba(feats_df)
-        confidence = float(proba[0][1])
+        confidence = float(model.predict_proba(feats_df)[0][1])
     except Exception:
         confidence = 1.0 if prediction == 1 else 0.0
 

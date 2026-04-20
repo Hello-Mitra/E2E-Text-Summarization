@@ -54,15 +54,22 @@ if predict_btn:
                 # ── Result card ───────────────────────────────────────────────
                 if sentiment == "Positive":
                     st.success(f"### 😊 {sentiment} Review")
+                    # Confidence bar
+                    st.metric(
+                        label="Confidence (Positive class probability)",
+                        value=f"{confidence * 100:.1f}%",
+                    )
+                    st.progress(confidence)
                 else:
                     st.error(f"### 😞 {sentiment} Review")
+                    # Confidence bar
+                    st.metric(
+                        label="Confidence (Negative class probability)",
+                        value=f"{(1 - confidence) * 100:.1f}%",
+                    )
+                    st.progress(1 - confidence)
 
-                # Confidence bar
-                st.metric(
-                    label="Confidence (Positive class probability)",
-                    value=f"{confidence * 100:.1f}%",
-                )
-                st.progress(confidence)
+                
 
                 # Preprocessed text
                 with st.expander("🔍 See preprocessed text"):
