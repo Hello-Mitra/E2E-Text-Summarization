@@ -2,15 +2,47 @@ import numpy as np
 import pandas as pd
 import pickle
 import json
-import os
+from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_auc_score
 import mlflow
 import mlflow.sklearn
 import dagshub
-from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_auc_score
+import os
 from src.logger import logging
 
 
+# Below code block is for production use
+# -------------------------------------------------------------------------------------
+# Set up DagsHub credentials for MLflow tracking
+dagshub_token = os.getenv("CAPSTONE_TEST")
+if not dagshub_token:
+    raise EnvironmentError("CAPSTONE_TEST environment variable is not set")
+
+os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
+os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
+
+dagshub_url = "https://dagshub.com"
+repo_owner = "Hello-Mitra"
+repo_name = "E2E-Text-Summarization"
+
+# Set up MLflow tracking URI
+mlflow.set_tracking_uri(f'{dagshub_url}/{repo_owner}/{repo_name}.mlflow')
+
+dagshub.init(
+    repo_owner="Hello-Mitra",
+    repo_name="E2E-Text-Summarization",
+    mlflow=True,
+)
+# -------------------------------------------------------------------------------------
+
+# Below code block is for local use
+# -------------------------------------------------------------------------------------
+# mlflow.set_tracking_uri('https://dagshub.com/Hello-Mitra/E2E-Text-Summarization.mlflow')
+# dagshub.init(repo_owner='Hello-Mitra', repo_name='E2E-Text-Summarization', mlflow=True)
+# -------------------------------------------------------------------------------------
+
+
 def load_model(file_path: str):
+    """Load the trained model from a file."""
     try:
         with open(file_path, 'rb') as file:
             model = pickle.load(file)
@@ -20,29 +52,38 @@ def load_model(file_path: str):
         logging.error('File not found: %s', file_path)
         raise
     except Exception as e:
-        logging.error('Unexpected error: %s', e)
+        logging.error('Unexpected error occurred while loading the model: %s', e)
         raise
 
-
 def load_data(file_path: str) -> pd.DataFrame:
+    """Load data from a CSV file."""
     try:
         df = pd.read_csv(file_path)
         logging.info('Data loaded from %s', file_path)
         return df
+    except pd.errors.ParserError as e:
+        logging.error('Failed to parse the CSV file: %s', e)
+        raise
     except Exception as e:
-        logging.error('Unexpected error: %s', e)
+        logging.error('Unexpected error occurred while loading the data: %s', e)
         raise
 
-
 def evaluate_model(clf, X_test: np.ndarray, y_test: np.ndarray) -> dict:
+    """Evaluate the model and return the evaluation metrics."""
     try:
-        y_pred       = clf.predict(X_test)
+        y_pred = clf.predict(X_test)
         y_pred_proba = clf.predict_proba(X_test)[:, 1]
+
+        accuracy = accuracy_score(y_test, y_pred)
+        precision = precision_score(y_test, y_pred)
+        recall = recall_score(y_test, y_pred)
+        auc = roc_auc_score(y_test, y_pred_proba)
+
         metrics_dict = {
-            'accuracy':  accuracy_score(y_test, y_pred),
-            'precision': precision_score(y_test, y_pred),
-            'recall':    recall_score(y_test, y_pred),
-            'auc':       roc_auc_score(y_test, y_pred_proba),
+            'accuracy': accuracy,
+            'precision': precision,
+            'recall': recall,
+            'auc': auc
         }
         logging.info('Model evaluation metrics calculated')
         return metrics_dict
@@ -50,59 +91,32 @@ def evaluate_model(clf, X_test: np.ndarray, y_test: np.ndarray) -> dict:
         logging.error('Error during model evaluation: %s', e)
         raise
 
-
 def save_metrics(metrics: dict, file_path: str) -> None:
+    """Save the evaluation metrics to a JSON file."""
     try:
         with open(file_path, 'w') as file:
             json.dump(metrics, file, indent=4)
         logging.info('Metrics saved to %s', file_path)
     except Exception as e:
-        logging.error('Error saving metrics: %s', e)
+        logging.error('Error occurred while saving the metrics: %s', e)
         raise
-
 
 def save_model_info(run_id: str, model_path: str, file_path: str) -> None:
+    """Save the model run ID and path to a JSON file."""
     try:
+        model_info = {'run_id': run_id, 'model_path': model_path}
         with open(file_path, 'w') as file:
-            json.dump({'run_id': run_id, 'model_path': model_path}, file, indent=4)
+            json.dump(model_info, file, indent=4)
         logging.debug('Model info saved to %s', file_path)
     except Exception as e:
-        logging.error('Error saving model info: %s', e)
+        logging.error('Error occurred while saving the model info: %s', e)
         raise
 
-
 def main():
-    try:
-        # ── Auth ──────────────────────────────────────────────────────────
-        dagshub_token = os.getenv("CAPSTONE_TEST")
-        if not dagshub_token:
-            raise EnvironmentError("CAPSTONE_TEST environment variable is not set")
-
-        os.environ["MLFLOW_TRACKING_USERNAME"] = dagshub_token
-        os.environ["MLFLOW_TRACKING_PASSWORD"] = dagshub_token
-
-        mlflow.set_tracking_uri(
-            "https://dagshub.com/Hello-Mitra/E2E-Text-Summarization.mlflow"
-        )
-        dagshub.init(
-            repo_owner="Hello-Mitra",
-            repo_name="E2E-Text-Summarization",
-            mlflow=True,
-        )
-
-        # -------------------------------------------------------------------------------------
-
-        # Below code block is for local use
-        # -------------------------------------------------------------------------------------
-        # mlflow.set_tracking_uri('https://dagshub.com/Hello-Mitra/E2E-Text-Summarization.mlflow')
-        # dagshub.init(repo_owner='Hello-Mitra', repo_name='E2E-Text-Summarization', mlflow=True)
-        # -------------------------------------------------------------------------------------
-
-        # ── Run ───────────────────────────────────────────────────────────
-        mlflow.set_experiment("my-dvc-pipeline")
-        with mlflow.start_run() as run:
-
-            clf       = load_model('./models/model.pkl')
+    mlflow.set_experiment("my-dvc-pipeline")
+    with mlflow.start_run() as run:
+        try:
+            clf = load_model('./models/model.pkl')
             test_data = load_data('./data/processed/test_tfidf.csv')
 
             X_test = test_data.iloc[:, :-1].values
@@ -111,15 +125,15 @@ def main():
             metrics = evaluate_model(clf, X_test, y_test)
             save_metrics(metrics, 'reports/metrics.json')
 
-            # Log metrics and params
-            for name, value in metrics.items():
-                mlflow.log_metric(name, value)
+            for metric_name, metric_value in metrics.items():
+                mlflow.log_metric(metric_name, metric_value)
 
             if hasattr(clf, 'get_params'):
-                for name, value in clf.get_params().items():
-                    mlflow.log_param(name, value)
+                params = clf.get_params()
+                for param_name, param_value in params.items():
+                    mlflow.log_param(param_name, param_value)
 
-            # Log model
+            # Log model to MLflow
             try:
                 mlflow.sklearn.log_model(clf, "model")
                 logging.info("✅ Model logged to MLflow successfully")
@@ -127,7 +141,7 @@ def main():
                 logging.error(f"❌ Failed to log model: {e}")
                 raise
 
-            # Log vectorizer — must be in same run as model so they stay paired
+            # Log vectorizer
             try:
                 mlflow.log_artifact('models/vectorizer.pkl', artifact_path='vectorizer')
                 logging.info("✅ Vectorizer logged to MLflow successfully")
@@ -135,15 +149,14 @@ def main():
                 logging.error(f"❌ Failed to log vectorizer: {e}")
                 raise
 
-            # Save run info for register_model.py
+            # Only runs if log_model succeeded
             save_model_info(run.info.run_id, "model", 'reports/experiment_info.json')
             mlflow.log_artifact('reports/metrics.json')
 
-    except Exception as e:
-        logging.error('Failed to complete model evaluation: %s', e)
-        print(f"Error: {e}")
-        raise
-
+        except Exception as e:
+            logging.error('Failed to complete the model evaluation process: %s', e)
+            print(f"Error: {e}")
+            raise   # ← add this
 
 if __name__ == '__main__':
     main()
