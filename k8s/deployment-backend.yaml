@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentiment-backend
+  labels:
+    app: sentiment-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sentiment-backend
+  template:
+    metadata:
+      labels:
+        app: sentiment-backend
+    spec:
+      containers:
+        - name: sentiment-backend
+          image: <AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/<ECR_BACKEND_REPO>:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: CAPSTONE_TEST
+              valueFrom:
+                secretKeyRef:
+                  name: capstone-secret
+                  key: CAPSTONE_TEST
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sentiment-backend-service
+spec:
+  selector:
+    app: sentiment-backend
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+  type: ClusterIP

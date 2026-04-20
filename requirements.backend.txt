@@ -21,9 +21,8 @@ pydantic
 # Monitoring
 prometheus-client
 
-# AWS / DVC
+# AWS
 boto3
-dvc[s3]     
 
-# Local package — makes src/ importable
+# Local package
 -e .

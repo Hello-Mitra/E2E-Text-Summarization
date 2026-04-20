@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentiment-frontend
+  labels:
+    app: sentiment-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sentiment-frontend
+  template:
+    metadata:
+      labels:
+        app: sentiment-frontend
+    spec:
+      containers:
+        - name: sentiment-frontend
+          image: <AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/<ECR_FRONTEND_REPO>:latest
+          ports:
+            - containerPort: 8501
+          env:
+            - name: BACKEND_URL
+              value: "http://sentiment-backend-service:8000"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "250m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sentiment-frontend-service
+spec:
+  selector:
+    app: sentiment-frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8501
+  type: LoadBalancer       # exposes Streamlit publicly via AWS ELB

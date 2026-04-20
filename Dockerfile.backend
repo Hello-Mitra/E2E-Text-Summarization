@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Python deps
+COPY setup.py .
 COPY requirements.backend.txt .
 RUN pip install --no-cache-dir -r requirements.backend.txt
 
@@ -18,8 +19,6 @@ RUN python -c "import nltk; nltk.download('stopwords'); nltk.download('wordnet')
 # Copy source
 COPY . .
 
-# Vectorizer must be present at runtime
-# (copied from DVC-tracked models/ folder during CI build)
 RUN mkdir -p models
 
 EXPOSE 8000

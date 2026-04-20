@@ -31,9 +31,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.backend.txt
 
-      # # ── 4b. Force reinstall DVC with S3 support ───────────────────────────
-      # - name: Install DVC with S3 support
-      #   run: pip install "dvc[s3]" --force-reinstall
+      # ── 4b. Force reinstall DVC with S3 support ───────────────────────────
+      - name: Install DVC with S3 support
+        run: pip install "dvc[s3]" --force-reinstall
 
       # ── 5. Download NLTK data ──────────────────────────────────────────────
       - name: Download NLTK data
@@ -124,7 +124,7 @@ jobs:
       #   run: |
       #     aws eks update-kubeconfig \
       #     --region ${{ secrets.AWS_DEFAULT_REGION }} \
-      #     --name flask-app-cluster
+      #     --name sentiment-app-cluster
 
       # - name: Create Kubernetes secret
       #   if: success()

@@ -1,0 +1,59 @@
+{
+  "title": "Sentiment Analysis — App Metrics",
+  "uid": "sentiment-app",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "10s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Total Requests",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "targets": [{
+        "expr": "sum(app_request_count_total)",
+        "legendFormat": "Total Requests"
+      }]
+    },
+    {
+      "id": 2,
+      "title": "Requests per Endpoint",
+      "type": "bargauge",
+      "gridPos": {"h": 4, "w": 9, "x": 6, "y": 0},
+      "targets": [{
+        "expr": "sum by (endpoint) (app_request_count_total)",
+        "legendFormat": "{{endpoint}}"
+      }]
+    },
+    {
+      "id": 3,
+      "title": "Prediction Distribution",
+      "type": "piechart",
+      "gridPos": {"h": 4, "w": 9, "x": 15, "y": 0},
+      "targets": [{
+        "expr": "sum by (prediction) (model_prediction_count_total)",
+        "legendFormat": "{{prediction}}"
+      }]
+    },
+    {
+      "id": 4,
+      "title": "Request Latency (p95) — /predict",
+      "type": "timeseries",
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 4},
+      "targets": [{
+        "expr": "histogram_quantile(0.95, sum(rate(app_request_latency_seconds_bucket{endpoint='/predict'}[5m])) by (le))",
+        "legendFormat": "p95 latency"
+      }]
+    },
+    {
+      "id": 5,
+      "title": "Request Rate (req/sec)",
+      "type": "timeseries",
+      "gridPos": {"h": 6, "w": 12, "x": 12, "y": 4},
+      "targets": [{
+        "expr": "sum(rate(app_request_count_total[5m]))",
+        "legendFormat": "req/sec"
+      }]
+    }
+  ]
+}
