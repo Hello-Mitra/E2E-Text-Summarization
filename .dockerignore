@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+myenv/
+.venv/
+venv/
+
+# Secrets
+.env
+.env.*
+
+# Git
+.git/
+.gitignore
+
+# Data and artifacts (DVC managed, not needed at runtime)
+data/
+artifacts/
+reports/
+logs/
+
+# Development only
+notebooks/
+tests/
+.dvc/
+.dvcignore
+
+# Documentation
+*.md
+*.txt
+!requirements.backend.txt
+!requirements.frontend.txt
+
+# Monitoring (not needed in backend image)
+monitoring/
+
+# K8s (not needed in image)
+k8s/
+
+# Scripts (CI only)
+scripts/
+
+# Other services (not needed in backend image)
+frontend/

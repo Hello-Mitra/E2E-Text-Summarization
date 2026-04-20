@@ -143,3 +143,11 @@ jobs:
       # - name: Deploy frontend to EKS
       #   if: success()
       #   run: kubectl apply -f k8s/deployment-frontend.yaml
+
+      # - name: Deploy prometheus to EKS
+      #   if: success()
+      #   run: kubectl apply -f k8s/deployment-prometheus.yaml
+
+      # - name: Deploy grafana to EKS
+      #   if: success()
+      #   run: kubectl apply -f k8s/deployment-grafana.yaml
