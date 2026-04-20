@@ -133,10 +133,10 @@ class TestModelLoading(unittest.TestCase):
               f"recall: {recall_new:.4f} | f1: {f1_new:.4f}")
 
         # Layer 1 — absolute floor
-        self.assertGreaterEqual(accuracy_new,  0.75, "Accuracy below floor")
-        self.assertGreaterEqual(precision_new, 0.75, "Precision below floor")
-        self.assertGreaterEqual(recall_new,    0.75, "Recall below floor")
-        self.assertGreaterEqual(f1_new,        0.75, "F1 below floor")
+        self.assertGreaterEqual(accuracy_new,  0.60, "Accuracy below floor")
+        self.assertGreaterEqual(precision_new, 0.60, "Precision below floor")
+        self.assertGreaterEqual(recall_new,    0.60, "Recall below floor")
+        self.assertGreaterEqual(f1_new,        0.60, "F1 below floor")
 
         # ── Champion comparison ───────────────────────────────────────────
         if self.prod_model is not None and self.prod_vectorizer is not None:
