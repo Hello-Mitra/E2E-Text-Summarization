@@ -83,37 +83,37 @@ jobs:
           CAPSTONE_TEST: ${{ secrets.CAPSTONE_TEST }}
         run: python -m unittest tests/test_app.py
 
-      # # ── 11. Login to Amazon ECR ────────────────────────────────────────────
-      # - name: Login to Amazon ECR
-      #   if: success()
-      #   id: login-ecr
-      #   uses: aws-actions/amazon-ecr-login@v2
+      # ── 11. Login to Amazon ECR ────────────────────────────────────────────
+      - name: Login to Amazon ECR
+        if: success()
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-      # # ── 12. Build Docker images ────────────────────────────────────────────
-      # - name: Build Backend Docker image
-      #   if: success()
-      #   run: docker build -f Dockerfile.backend -t sentiment-backend .
+      # ── 12. Build Docker images ────────────────────────────────────────────
+      - name: Build Backend Docker image
+        if: success()
+        run: docker build -f Dockerfile.backend -t sentiment-backend .
 
-      # - name: Build Frontend Docker image
-      #   if: success()
-      #   run: docker build -f Dockerfile.frontend -t sentiment-frontend .
+      - name: Build Frontend Docker image
+        if: success()
+        run: docker build -f Dockerfile.frontend -t sentiment-frontend .
 
-      # # ── 13. Tag and push images to ECR ─────────────────────────────────────
-      # - name: Tag and push Backend image
-      #   if: success()
-      #   run: |
-      #     docker tag sentiment-backend:latest \
-      #     ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:latest
-      #     docker push \
-      #     ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:latest
+      # ── 13. Tag and push images to ECR ─────────────────────────────────────
+      - name: Tag and push Backend image
+        if: success()
+        run: |
+          docker tag sentiment-backend:latest \
+          ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:latest
+          docker push \
+          ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_BACKEND_REPO }}:latest
 
-      # - name: Tag and push Frontend image
-      #   if: success()
-      #   run: |
-      #     docker tag sentiment-frontend:latest \
-      #     ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:latest
-      #     docker push \
-      #     ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:latest
+      - name: Tag and push Frontend image
+        if: success()
+        run: |
+          docker tag sentiment-frontend:latest \
+          ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:latest
+          docker push \
+          ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:latest
 
       # # ── 14. Deploy to EKS ──────────────────────────────────────────────────
       # - name: Set up kubectl
