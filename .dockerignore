@@ -6,6 +6,7 @@ __pycache__/
 myenv/
 .venv/
 venv/
+src.egg-info/
 
 # Secrets
 .env
@@ -15,8 +16,9 @@ venv/
 .git/
 .gitignore
 
-# Data and artifacts (DVC managed, not needed at runtime)
+# Data — DVC managed
 data/
+models/
 artifacts/
 reports/
 logs/
@@ -26,21 +28,29 @@ notebooks/
 tests/
 .dvc/
 .dvcignore
+dvc.yaml
+dvc.lock
+params.yaml
 
-# Documentation
+# Text files — not needed at runtime
 *.md
+LICENSE
 *.txt
 !requirements.backend.txt
 !requirements.frontend.txt
 
-# Monitoring (not needed in backend image)
+# Cookiecutter leftovers
+Makefile
+tox.ini
+test_environment.py
+local_s3/
+
+# Docker files — not needed inside image
+Dockerfile.backend
+Dockerfile.frontend
+docker-compose.yml
+
+# Other services
 monitoring/
-
-# K8s (not needed in image)
 k8s/
-
-# Scripts (CI only)
 scripts/
-
-# Other services (not needed in backend image)
-frontend/
