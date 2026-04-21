@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: sentiment-backend
-          image: <AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/<ECR_BACKEND_REPO>:latest
+          image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_BACKEND_REPO}:latest
           ports:
             - containerPort: 8000
           env:

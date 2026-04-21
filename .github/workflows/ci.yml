@@ -115,39 +115,49 @@ jobs:
           docker push \
           ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_FRONTEND_REPO }}:latest
 
-      # # ── 14. Deploy to EKS ──────────────────────────────────────────────────
-      # - name: Set up kubectl
-      #   if: success()
-      #   uses: azure/setup-kubectl@v3
-      #   with:
-      #     version: "latest"
+      # ── 14. Deploy to EKS ──────────────────────────────────────────────────
+      - name: Set up kubectl
+        if: success()
+        uses: azure/setup-kubectl@v3
+        with:
+          version: "latest"
 
-      # - name: Update kubeconfig for EKS
-      #   if: success()
-      #   run: |
-      #     aws eks update-kubeconfig \
-      #     --region ${{ secrets.AWS_DEFAULT_REGION }} \
-      #     --name sentiment-app-cluster
+      - name: Update kubeconfig for EKS
+        if: success()
+        run: |
+          aws eks update-kubeconfig \
+          --region ${{ secrets.AWS_DEFAULT_REGION }} \
+          --name sentiment-app-cluster
 
-      # - name: Create Kubernetes secret
-      #   if: success()
-      #   run: |
-      #     kubectl create secret generic capstone-secret \
-      #       --from-literal=CAPSTONE_TEST=${{ secrets.CAPSTONE_TEST }} \
-      #       --dry-run=client -o yaml | kubectl apply -f -
+      - name: Create Kubernetes secret
+        if: success()
+        run: |
+          kubectl create secret generic capstone-secret \
+            --from-literal=CAPSTONE_TEST=${{ secrets.CAPSTONE_TEST }} \
+            --dry-run=client -o yaml | kubectl apply -f -
 
-      # - name: Deploy backend to EKS
-      #   if: success()
-      #   run: kubectl apply -f k8s/deployment-backend.yaml
+      - name: Deploy backend to EKS
+        if: success()
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          AWS_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+          ECR_BACKEND_REPO: ${{ secrets.ECR_BACKEND_REPO }}
+        run: |
+          envsubst < k8s/deployment-backend.yaml | kubectl apply -f -
 
-      # - name: Deploy frontend to EKS
-      #   if: success()
-      #   run: kubectl apply -f k8s/deployment-frontend.yaml
+      - name: Deploy frontend to EKS
+        if: success()
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          AWS_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+          ECR_FRONTEND_REPO: ${{ secrets.ECR_FRONTEND_REPO }}
+        run: |
+          envsubst < k8s/deployment-frontend.yaml | kubectl apply -f -
 
-      # - name: Deploy prometheus to EKS
-      #   if: success()
-      #   run: kubectl apply -f k8s/deployment-prometheus.yaml
+      - name: Deploy prometheus to EKS
+        if: success()
+        run: kubectl apply -f k8s/deployment-prometheus.yaml
 
-      # - name: Deploy grafana to EKS
-      #   if: success()
-      #   run: kubectl apply -f k8s/deployment-grafana.yaml
+      - name: Deploy grafana to EKS
+        if: success()
+        run: kubectl apply -f k8s/deployment-grafana.yaml

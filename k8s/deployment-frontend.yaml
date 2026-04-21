@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: sentiment-frontend
-          image: <AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/<ECR_FRONTEND_REPO>:latest
+          image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_FRONTEND_REPO}:latest
           ports:
             - containerPort: 8501
           env:
